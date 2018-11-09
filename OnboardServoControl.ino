@@ -1,83 +1,251 @@
 /*************************************************** 
-  This is an example for our Adafruit 16-channel PWM & Servo driver
-  Servo test - this will drive 8 servos, one after the other on the
-  first 8 pins of the PCA9685
+DBF 2018 Onboard Arduino Control
+Date: 11/7/2018
 
-  Pick one up today in the adafruit shop!
-  ------> http://www.adafruit.com/products/815
-  
-  These drivers use I2C to communicate, 2 pins are required to  
-  interface.
+Description:
+This program will parse three input channels from the reciever into the arduino and will then control the output to the servos via servo driver board
 
-  Adafruit invests time and resources providing this open source code, 
-  please support Adafruit and open-source hardware by purchasing 
-  products from Adafruit!
+Payload Release Layout
 
-  Written by Limor Fried/Ladyada for Adafruit Industries.  
-  BSD license, all text above must be included in any redistribution
+_________ 1 __________ 2 __________ 3 __________
+|
+|
+|
+A    A1L-----A1R   A2L-----A2R   A3L-----A3R
+|    |        |    |        |    |        |    
+|    S0       S1   S2       S3  S4       S5
+|    |        |                  |        | 
+B    B1L-----B1R   B2L-----B2R   B3L-----B3R
+|                  |        |
+|                  S6       S7
+|                  |        |
+C                  C2L----C2R
+|
+|
+
+
+Controller Scheme
+
+Pot1(Ch.6)(DIO 3): Columns
+0-15: 1
+15-85: 2
+85-100: 3
+
+Pot2(Ch.7)(DIO 4): Rows
+0-15: A
+15-85: B
+85-100: C
+
+Switch(Ch.8)(DIO 5): Release
+Nuetral: Nothing
+Forward: Release Left
+Backward: Release Right
  ****************************************************/
 
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
 
-// called this way, it uses the default address 0x40
+//Initialize the PWM ServoDriver
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-// you can also call it with a different address you want
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
-// you can also call it with a different address and I2C interface
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(&Wire, 0x40);
 
-// Depending on your servo make, the pulse width min and max may vary, you 
-// want these to be as small/large as possible without hitting the hard stop
-// for max range. You'll have to tweak them as necessary to match the servos you
-// have!
-#define SERVOMIN  2048 // this is the 'minimum' pulse length count (out of 4096)
-#define SERVOMAX  4096 // this is the 'maximum' pulse length count (out of 4096)
+
+//Servo Settings
+const int SERVOFREQ 50  // This gives a signal every 20ms
+const int SERVOMIN  205 // this is the 'minimum' pulse length count (out of 4096) approx 1ms
+const int SERVOMAX  410 // this is the 'maximum' pulse length count (out of 4096) approx 2ms
+const int nServos = 8;
+const int fAngle = 0;
+const int bAngle = 180;
+
+//Input Channels
+const int POT1 = 3;
+const int POT2 = 4;
+const int SWITCH = 5;
+
+//Input Settings
+const int LOWTHRESH = 15;
+const int HIGHTHRESH = 85;
+
+unsigned long lowMicroseconds = 2000*LOWTHRESH/100;
+unsigned long highMicroseconds = 2000*HIGHTHRESH/100;
+
+//Variables for which is the current selected store
+int row = 0;
+int col = 0;
+int switchPos = 1;
+
+unsigned long pulselength;
+
+int angle[nServos];
+
+void setServoAngle(servoPin,angle){
+  pwm.setPWM(servoPin,0,round(map(angle,0,180,205,410)));
+}
+
+int parseInput(pin,lowThresh,highThresh){
+  //This will parse out the inputs
+  pulselength = pulseIn(pin,HIGH);
+
+  if(pulselength < lowThresh){
+    return 0;
+  }else if(pulselength > highThresh){
+    return 2;
+  }else{
+    return 1;
+  }
+}
 
 // our servo # counter
 uint8_t servonum = 0;
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("8 channel Servo test!");
 
   pwm.begin();
   
-  pwm.setPWMFreq(1000);  // Analog servos run at ~60 Hz updates
-
-  delay(10);
-}
-
-// you can use this function if you'd like to set the pulse length in seconds
-// e.g. setServoPulse(0, 0.001) is a ~1 millisecond pulse width. its not precise!
-void setServoPulse(uint8_t n, double pulse) {
-  double pulselength;
-  
-  pulselength = 1000000;   // 1,000,000 us per second
-  pulselength /= 60;   // 60 Hz
-  Serial.print(pulselength); Serial.println(" us per period"); 
-  pulselength /= 4096;  // 12 bits of resolution
-  Serial.print(pulselength); Serial.println(" us per bit"); 
-  pulse *= 1000000;  // convert to us
-  pulse /= pulselength;
-  Serial.println(pulse);
-  pwm.setPWM(n, 0, pulse);
+  pwm.setPWMFreq(SERVOFREQ);  // Analog servos run at ~60 Hz updates
 }
 
 void loop() {
-  // Drive each servo one at a time
-  Serial.println(servonum);
-  for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
-    pwm.setPWM(servonum, 0, pulselen);
+  // Check for which pair pots say it is in
+  col = parseInput(POT1,lowMicroseconds,highMicroseconds);
+  row = parseInput(POT2,lowMicroseconds,highMicroseconds);
+  switchPos = parseInput(SWITCH,lowMicroseconds,highMicroseconds);
+
+  //Set all angles to their default
+  for(int i = 0; i < nServos; i++){
+   angle[i] = 90;
   }
 
-  delay(500);
-  for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
-    pwm.setPWM(servonum, 0, pulselen);
+  //Set the Servo if necessary
+  switch(row){
+    case 0:
+      switch(col){
+        case 0:
+          switch(switchPos){
+            case 0:
+              //A1L
+              angle[0] = fAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //A1R
+              angle[1] = fAngle;
+              break;
+          }
+          break;
+        case 1:
+          switch(switchPos){
+            case 0:
+              //A2L
+              angle[2] = fAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //A2R
+              angle[3] = fAngle;
+              break;
+          }
+          break;
+        case 2: 
+          switch(switchPos){
+            case 0:
+              //A3L
+              angle[4] = fAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //A3R
+              angle[5] = fAngle;
+              break;
+          }
+          break;
+      }
+      break;
+    case 1:
+      switch(col){
+        case 0:
+          switch(switchPos){
+            case 0:
+              //B1L
+              angle[0] = bAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //B1R
+              angle[1] = bAngle;
+              break;
+          }
+          break;
+        case 1:
+          switch(switchPos){
+            case 0:
+              //B2L
+              angle[6] = fAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //B2R
+              angle[7] = fAngle;
+              break;
+          }
+          break;
+        case 2: 
+          switch(switchPos){
+            case 0:
+              //B3L
+              angle[4] = bAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //B3R
+              angle[5] = bAngle;
+              break;
+          }
+          break;
+      }
+      break;
+    case 2: 
+      switch(col){
+        case 0:
+          
+          break;
+        case 1:
+          switch(switchPos){
+            case 0:
+              //B2L
+              angle[6] = bAngle;
+              break;
+            case 1:
+              //Nothing
+              break;
+            case 2;
+              //B2R
+              angle[7] = bAngle;
+              break;
+          }
+          break;
+        case 2: 
+          
+          break;
+      }
+      break;
   }
 
-  delay(500);
-
-  servonum ++;
-  if (servonum > 7) servonum = 0;
+  //set all of the servos
+  for(int i = 0; i < nServos; i++){
+    setServoAngle(i,angle[i]);
+  }
+  
 }
