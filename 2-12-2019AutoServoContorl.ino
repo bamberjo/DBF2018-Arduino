@@ -9,15 +9,17 @@ This program will use the input from a single channel on the main reciever to re
 //Stores n + 8 are the pair on the other side of the servo
  ****************************************************/
 
+#include "Servo.h"
+
 //Input Channels
 const int signalChannel = 5;//D2
-const int signalThresh = 1400;//Microseconds threshold for a positive reading on the signal
+const int signalThresh = 1800;//Microseconds threshold for a positive reading on the signal
 
 const int nServos = 8;
 const int nStores = 16;
 Servo releaseServos[nServos];
-const int releaseOrder = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};//Order of release for all of the servos
-const int servoChannels = {6,7,8,9,10,11,12,13};//Which channel all of the servos will be connected to 
+const int releaseOrder[16] = {0,1,2,8,9,10,6,7,8,9,10,11,12,13,14,15};//Order of release for all of the servos
+const int servoChannels[8] = {6,7,8,9,10,11,12,13};//Which channel all of the servos will be connected to 
 
 //Angles for all of the servos
 const int leftangle = 20;
@@ -30,9 +32,9 @@ bool signaled = false;
 
 bool parseInput(int pin,int thresh){
   //This will parse out the inputs
-  pulselength = pulseIn(pin,HIGH);
+  int pulselength = pulseIn(pin,HIGH);
 
-  if(pulselength < thresh){
+  if(pulselength < thresh){ 
     return false;
   }else{
     return true;
@@ -44,16 +46,20 @@ void setup()
   //Initialize all of the servos
   for(int i = 0; i < nServos; i++){
     releaseServos[i].attach(servoChannels[i]);
-    releaseServos[i].write(centerAngle);
+    releaseServos[i].write(centerangle);
   }
+
+  Serial.begin(9600);
   
 }
 
 void loop()
 {
+  
   delay(10);//Hopefully this will elimate double readings if there is a little bit of noise.
   signaled = parseInput(signalChannel,signalThresh);
   if(signaled && !activatedLast){
+    Serial.println("Part1");
     activatedLast = true;//This will make sure that it does not just keep iterating through the stores when a signal is coming in.
     //The store should drop
     //Check if the right or left should be used
@@ -78,7 +84,7 @@ void loop()
           releaseServos[releaseOrder[servoNum]].write(centerangle);
         }
 
-      servoNum++
+      servoNum++;
 
       //Check if it is time to wrap around
       if(servoNum >= nStores){
