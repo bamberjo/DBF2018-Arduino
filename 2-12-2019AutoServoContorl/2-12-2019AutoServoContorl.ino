@@ -22,9 +22,9 @@ const int releaseOrder[nStores] = {0,1,2,3,4,5,6,7,8,9,10,11};//Order of release
 const int servoChannels[nServos] = {2,3,4,5,6,7};//Which channel all of the servos will be connected to 
 
 //Angles for all of the servos
-const int secondangles[nServos] = {30,30,30,30,150,30};
-const int centerangles[nServos] = {100,100,100,100,100,100};
-const int firstangles[nServos] = {50,50,50,50,130,50};
+const int secondangles[nServos] = {130,30,140,30,130,30};
+const int centerangles[nServos] = {40,140,40,130,50,140};
+const int firstangles[nServos] = {80,90,90,90,90,90};
 
 int storeNum = 0;//Counter to keep track of the current store
 int servoNum = 0;//Counter to keep track of which servo is currently being addressed
@@ -47,7 +47,7 @@ void setup()
   //Initialize all of the servos
   for(int i = 0; i < nServos; i++){
     releaseServos[i].attach(servoChannels[i]);
-    releaseServos[i].write(centerangles[servoNum]);
+    releaseServos[i].write(centerangles[i]);
   }
 
   Serial.begin(9600);
@@ -65,7 +65,7 @@ void loop()
     //The store should drop
     //Check if the right or left should be used
     if(releaseOrder[storeNum] >= nServos){
-      servoNum = storeNum - (nServos-1);
+      servoNum = storeNum - (nServos);
       //We are in the 'second' stores
       releaseServos[releaseOrder[servoNum]].write(secondangles[servoNum]);
       Serial.print((releaseOrder[servoNum]));
