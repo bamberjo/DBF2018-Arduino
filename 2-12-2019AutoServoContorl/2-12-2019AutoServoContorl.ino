@@ -65,17 +65,17 @@ void loop()
     //The store should drop
     //Check if the right or left should be used
     if(releaseOrder[storeNum] >= nServos){
-      servoNum = storeNum - (nServos);
+      servoNum = releaseOrder[storeNum] - (nServos);
       //We are in the 'second' stores
-      releaseServos[releaseOrder[servoNum]].write(secondangles[servoNum]);
-      Serial.print((releaseOrder[servoNum]));
+      releaseServos[servoNum].write(secondangles[servoNum]);
+      Serial.print(servoNum);
       Serial.print("angle:");
       Serial.println(secondangles[servoNum]);
     }else{
       //We are in the 'first' stores
-      servoNum = storeNum;
-      releaseServos[releaseOrder[servoNum]].write(firstangles[servoNum]);
-      Serial.print((releaseOrder[servoNum]));
+      servoNum = releaseOrder[storeNum];
+      releaseServos[servoNum].write(firstangles[servoNum]);
+      Serial.print(servoNum);
       Serial.print("angle:");
       Serial.println(firstangles[servoNum]);
     }
@@ -85,9 +85,9 @@ void loop()
     
     if(activatedLast){
       //Here the servoNum should be iterated after resetting that servo.
-      releaseServos[(releaseOrder[servoNum])].write(centerangles[servoNum]);
-      Serial.print((releaseOrder[servoNum]));
-      Serial.println("centered");
+      //releaseServos[(releaseOrder[servoNum])].write(centerangles[servoNum]);
+      //Serial.print((releaseOrder[servoNum]));
+      //Serial.println("centered");
         /*if(releaseOrder[servoNum] > 5){
           servoNum = storeNum - (nServos-1);
           //We are in the 'second' stores
